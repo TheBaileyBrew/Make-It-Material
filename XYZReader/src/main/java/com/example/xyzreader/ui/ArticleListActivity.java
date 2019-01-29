@@ -1,5 +1,6 @@
 package com.example.xyzreader.ui;
 
+import android.app.ActivityOptions;
 import android.app.LoaderManager;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -8,24 +9,33 @@ import android.content.IntentFilter;
 import android.content.Loader;
 import android.database.Cursor;
 import android.os.Bundle;
-import android.support.v4.widget.SwipeRefreshLayout;
-import android.support.v7.app.ActionBarActivity;
-import android.support.v7.widget.RecyclerView;
-import android.support.v7.widget.StaggeredGridLayoutManager;
-import android.support.v7.widget.Toolbar;
+
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
+import androidx.recyclerview.widget.RecyclerView;
+import androidx.appcompat.widget.Toolbar;
 import android.text.Html;
 import android.text.format.DateUtils;
 import android.util.Log;
-import android.util.TypedValue;
-import android.view.MenuItem;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.animation.AnimationUtils;
+import android.view.animation.Interpolator;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.example.xyzreader.R;
+import com.example.xyzreader.adapters.CollapsingToolbarListener;
+import com.example.xyzreader.adapters.ImageLoaderHelper;
 import com.example.xyzreader.data.ArticleLoader;
 import com.example.xyzreader.data.ItemsContract;
 import com.example.xyzreader.data.UpdaterService;
+import com.example.xyzreader.objects.DynamicHeightNetworkImageView;
+import com.example.xyzreader.utils.ViewTransitionUtils;
+import com.google.android.material.appbar.AppBarLayout;
+import com.squareup.picasso.Picasso;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -38,13 +48,18 @@ import java.util.GregorianCalendar;
  * touched, lead to a {@link ArticleDetailActivity} representing item details. On tablets, the
  * activity presents a grid of items as cards.
  */
-public class ArticleListActivity extends ActionBarActivity implements
+public class ArticleListActivity extends AppCompatActivity implements
         LoaderManager.LoaderCallbacks<Cursor> {
 
     private static final String TAG = ArticleListActivity.class.toString();
     private Toolbar mToolbar;
+    private AppBarLayout appBarLayout;
     private SwipeRefreshLayout mSwipeRefreshLayout;
     private RecyclerView mRecyclerView;
+
+
+    private int lastAnimatedPosition = -1;
+    private Interpolator mInterpolator;
 
     private SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.sss");
     // Use default locale format
@@ -58,11 +73,20 @@ public class ArticleListActivity extends ActionBarActivity implements
         setContentView(R.layout.activity_article_list);
 
         mToolbar = (Toolbar) findViewById(R.id.toolbar);
+        appBarLayout = findViewById(R.id.app_toolbar);
+        setupToolbar();
 
+        ViewTransitionUtils.setupEnterExplodeAnimation(this);
+        ViewTransitionUtils.setupExitExplodeAnimation(this);
 
-        final View toolbarContainerView = findViewById(R.id.toolbar_container);
 
         mSwipeRefreshLayout = (SwipeRefreshLayout) findViewById(R.id.swipe_refresh_layout);
+        mSwipeRefreshLayout.setOnRefreshListener(new SwipeRefreshLayout.OnRefreshListener() {
+            @Override
+            public void onRefresh() {
+                refresh();
+            }
+        });
 
         mRecyclerView = (RecyclerView) findViewById(R.id.recycler_view);
         getLoaderManager().initLoader(0, null, this);
@@ -70,6 +94,27 @@ public class ArticleListActivity extends ActionBarActivity implements
         if (savedInstanceState == null) {
             refresh();
         }
+    }
+
+    private void setupToolbar() {
+        setSupportActionBar(mToolbar);
+        appBarLayout.setExpanded(true);
+        appBarLayout.addOnOffsetChangedListener(new CollapsingToolbarListener() {
+            @Override
+            public void onStateChanged(AppBarLayout appBarLayout, State state) {
+                switch (state) {
+                    case EXPANDED:
+                        Log.i(TAG, "onStateChanged: expanded");
+                        break;
+                    case COLLAPSED:
+                        Log.i(TAG, "onStateChanged: collapse");
+                        break;
+                    case IDLE:
+                        Log.i(TAG, "onStateChanged: idle");
+                        break;
+                }
+            }
+        });
     }
 
     private void refresh() {
@@ -114,11 +159,10 @@ public class ArticleListActivity extends ActionBarActivity implements
     public void onLoadFinished(Loader<Cursor> cursorLoader, Cursor cursor) {
         Adapter adapter = new Adapter(cursor);
         adapter.setHasStableIds(true);
+        LinearLayoutManager linearLayoutManager = new LinearLayoutManager(this,RecyclerView.VERTICAL, false);
+        mRecyclerView.setLayoutManager(linearLayoutManager);
         mRecyclerView.setAdapter(adapter);
-        int columnCount = getResources().getInteger(R.integer.list_column_count);
-        StaggeredGridLayoutManager sglm =
-                new StaggeredGridLayoutManager(columnCount, StaggeredGridLayoutManager.VERTICAL);
-        mRecyclerView.setLayoutManager(sglm);
+        adapter.notifyDataSetChanged();;
     }
 
     @Override
@@ -126,11 +170,40 @@ public class ArticleListActivity extends ActionBarActivity implements
         mRecyclerView.setAdapter(null);
     }
 
-    private class Adapter extends RecyclerView.Adapter<ViewHolder> {
+    private class Adapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         private Cursor mCursor;
 
         public Adapter(Cursor cursor) {
             mCursor = cursor;
+            mInterpolator = AnimationUtils.loadInterpolator(ArticleListActivity.this,android.R.interpolator.anticipate_overshoot);
+        }
+
+        class ViewHolderRight extends RecyclerView.ViewHolder {
+            public ImageView thumbnailView;
+            public TextView titleView;
+            public TextView subtitleView;
+
+            public ViewHolderRight(View view) {
+                super(view);
+
+                thumbnailView = view.findViewById(R.id.thumbnail);
+                titleView = (TextView) view.findViewById(R.id.article_title);
+                subtitleView = (TextView) view.findViewById(R.id.article_subtitle);
+
+            }
+        }
+
+        class ViewHolderLeft extends RecyclerView.ViewHolder {
+            public ImageView thumbnailView;
+            public TextView titleView;
+            public TextView subtitleView;
+
+            public ViewHolderLeft(View view) {
+                super(view);
+                thumbnailView = view.findViewById(R.id.thumbnail);
+                titleView = (TextView) view.findViewById(R.id.article_title);
+                subtitleView = (TextView) view.findViewById(R.id.article_subtitle);
+            }
         }
 
         @Override
@@ -140,17 +213,39 @@ public class ArticleListActivity extends ActionBarActivity implements
         }
 
         @Override
-        public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
-            View view = getLayoutInflater().inflate(R.layout.list_item_article, parent, false);
-            final ViewHolder vh = new ViewHolder(view);
-            view.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    startActivity(new Intent(Intent.ACTION_VIEW,
-                            ItemsContract.Items.buildItemUri(getItemId(vh.getAdapterPosition()))));
-                }
-            });
-            return vh;
+        public int getItemViewType(int position) {
+            return position % 2 * 2;
+        }
+
+        @Override
+        public RecyclerView.ViewHolder onCreateViewHolder(final ViewGroup parent, int viewType) {
+            View view;
+            switch(viewType) {
+                case 0:
+                default:
+                    view = LayoutInflater.from(parent.getContext())
+                            .inflate(R.layout.list_item_article, parent, false);
+                    final Adapter.ViewHolderLeft vhl = new Adapter.ViewHolderLeft(view);
+                    view.setOnClickListener(new View.OnClickListener() {
+                        @Override
+                        public void onClick(View view) {
+                            startActivity(new Intent(Intent.ACTION_VIEW,
+                                    ItemsContract.Items.buildItemUri(getItemId(vhl.getAdapterPosition()))));;
+                        }
+                    });
+                    return vhl;
+                case 2:
+                    view = getLayoutInflater().inflate(R.layout.list_item_article_alternate, parent, false);
+                    final Adapter.ViewHolderRight vhr = new Adapter.ViewHolderRight(view);
+                    view.setOnClickListener(new View.OnClickListener() {
+                        @Override
+                        public void onClick(View view) {
+                            startActivity(new Intent(Intent.ACTION_VIEW,
+                                    ItemsContract.Items.buildItemUri(getItemId(vhr.getAdapterPosition()))));
+                        }
+                    });
+                    return vhr;
+            }
         }
 
         private Date parsePublishedDate() {
@@ -165,29 +260,71 @@ public class ArticleListActivity extends ActionBarActivity implements
         }
 
         @Override
-        public void onBindViewHolder(ViewHolder holder, int position) {
+        public void onBindViewHolder(RecyclerView.ViewHolder holder, int position) {
             mCursor.moveToPosition(position);
-            holder.titleView.setText(mCursor.getString(ArticleLoader.Query.TITLE));
-            Date publishedDate = parsePublishedDate();
-            if (!publishedDate.before(START_OF_EPOCH.getTime())) {
-
-                holder.subtitleView.setText(Html.fromHtml(
-                        DateUtils.getRelativeTimeSpanString(
-                                publishedDate.getTime(),
-                                System.currentTimeMillis(), DateUtils.HOUR_IN_MILLIS,
-                                DateUtils.FORMAT_ABBREV_ALL).toString()
-                                + "<br/>" + " by "
-                                + mCursor.getString(ArticleLoader.Query.AUTHOR)));
-            } else {
-                holder.subtitleView.setText(Html.fromHtml(
-                        outputFormat.format(publishedDate)
-                        + "<br/>" + " by "
-                        + mCursor.getString(ArticleLoader.Query.AUTHOR)));
+            switch(holder.getItemViewType()) {
+                case 0:
+                default:
+                    Adapter.ViewHolderLeft viewHolderLeft = (Adapter.ViewHolderLeft)holder;
+                    viewHolderLeft.titleView.setText(mCursor.getString(ArticleLoader.Query.TITLE));
+                    Date publishedDate = parsePublishedDate();
+                    if (!publishedDate.before(START_OF_EPOCH.getTime())) {
+                        viewHolderLeft.subtitleView.setText(Html.fromHtml(
+                                DateUtils.getRelativeTimeSpanString(
+                                        publishedDate.getTime(),
+                                        System.currentTimeMillis(), DateUtils.HOUR_IN_MILLIS,
+                                        DateUtils.FORMAT_ABBREV_ALL).toString()
+                                        + "<br/>" + " by "
+                                        + mCursor.getString(ArticleLoader.Query.AUTHOR)));
+                    } else {
+                        viewHolderLeft.subtitleView.setText(Html.fromHtml(
+                                outputFormat.format(publishedDate)
+                                        + "<br/>" + " by "
+                                        + mCursor.getString(ArticleLoader.Query.AUTHOR)));
+                    }
+                    Picasso.get()
+                            .load(mCursor.getString(ArticleLoader.Query.THUMB_URL))
+                            .into(viewHolderLeft.thumbnailView);
+                    setAnimation(viewHolderLeft.itemView, position);
+                    break;
+                case 2:
+                    Adapter.ViewHolderRight viewHolderRight = (Adapter.ViewHolderRight)holder;
+                    viewHolderRight.titleView.setText(mCursor.getString(ArticleLoader.Query.TITLE));
+                    Date publishedRightDate = parsePublishedDate();
+                    if (!publishedRightDate.before(START_OF_EPOCH.getTime())) {
+                        viewHolderRight.subtitleView.setText(Html.fromHtml(
+                                DateUtils.getRelativeTimeSpanString(
+                                        publishedRightDate.getTime(),
+                                        System.currentTimeMillis(), DateUtils.HOUR_IN_MILLIS,
+                                        DateUtils.FORMAT_ABBREV_ALL).toString()
+                                        + "<br/>" + " by "
+                                        + mCursor.getString(ArticleLoader.Query.AUTHOR)));
+                    } else {
+                        viewHolderRight.subtitleView.setText(Html.fromHtml(
+                                outputFormat.format(publishedRightDate)
+                                        + "<br/>" + " by "
+                                        + mCursor.getString(ArticleLoader.Query.AUTHOR)));
+                    }
+                    Picasso.get()
+                            .load(mCursor.getString(ArticleLoader.Query.THUMB_URL))
+                            .into(viewHolderRight.thumbnailView);
+                    setAnimation(viewHolderRight.itemView, position);
+                    break;
             }
-            holder.thumbnailView.setImageUrl(
-                    mCursor.getString(ArticleLoader.Query.THUMB_URL),
-                    ImageLoaderHelper.getInstance(ArticleListActivity.this).getImageLoader());
-            holder.thumbnailView.setAspectRatio(mCursor.getFloat(ArticleLoader.Query.ASPECT_RATIO));
+        }
+
+        private void setAnimation(View viewAnimating, int position) {
+            if (position > lastAnimatedPosition) {
+                viewAnimating.setTranslationY((position + 1) * 1000);
+                viewAnimating.setAlpha(0.85f);
+                viewAnimating.animate()
+                        .translationY(0f)
+                        .alpha(1f)
+                        .setInterpolator(mInterpolator)
+                        .setDuration(1000L)
+                        .start();
+                lastAnimatedPosition = position;
+            }
         }
 
         @Override
@@ -196,16 +333,4 @@ public class ArticleListActivity extends ActionBarActivity implements
         }
     }
 
-    public static class ViewHolder extends RecyclerView.ViewHolder {
-        public DynamicHeightNetworkImageView thumbnailView;
-        public TextView titleView;
-        public TextView subtitleView;
-
-        public ViewHolder(View view) {
-            super(view);
-            thumbnailView = (DynamicHeightNetworkImageView) view.findViewById(R.id.thumbnail);
-            titleView = (TextView) view.findViewById(R.id.article_title);
-            subtitleView = (TextView) view.findViewById(R.id.article_subtitle);
-        }
-    }
 }

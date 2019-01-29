@@ -17,12 +17,52 @@
 
 <resources>
 
-    <style name="Theme.Bacon" parent="@style/Theme.AppCompat.Light.NoActionBar">
+    <style name="Theme.Bacon" parent="@style/Theme.AppCompat.DayNight.DarkActionBar">
 
     </style>
 
     <style name="Theme.Bacon.Detail">
-        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
+        <item name="colorAccent">@color/colorAccent</item>
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+        <item name="android:windowContentTransitions">true</item>
+        <item name="android:windowEnterTransition">@transition/activity_fade</item>
+        <item name="android:windowExitTransition">@transition/activity_fade</item>
+        <item name="android:windowSharedElementEnterTransition">@transition/activity_change_bounds</item>
+        <item name="android:windowSharedElementExitTransition">@transition/activity_change_bounds</item>
+
     </style>
+
+    <style name="ExpandedToolbar" parent="@android:style/TextAppearance.Material.Title">
+        <item name="android:textColor">@color/colorToolbarExpanded</item>
+        <item name="android:textSize">36sp</item>
+    </style>
+
+    <style name="CollapsedToolbar" parent="@android:style/TextAppearance.Material.Title">
+        <item name="android:textColor">@color/colorToolbarExpanded</item>
+        <item name="android:textSize">24sp</item>
+    </style>
+
+    <style name="ExpandedArticleToolbar" parent="@android:style/TextAppearance.Material.Title">
+        <item name="android:textColor">@color/colorToolbarArticleExpanded</item>
+        <item name="android:shadowDx">2</item>
+        <item name="android:shadowDy">2</item>
+        <item name="android:shadowColor">@color/colorToolbarArticleCollapsed</item>
+        <item name="android:shadowRadius">2</item>
+        <item name="android:textSize">32sp</item>
+    </style>
+
+    <style name="CollapsedArticleToolbar" parent="@android:style/TextAppearance.Material.Title">
+        <item name="android:textColor">@color/colorToolbarArticleCollapsed</item>
+        <item name="android:layout_marginBottom">10dp</item>
+        <item name="android:shadowDx">2</item>
+        <item name="android:shadowDy">2</item>
+        <item name="android:shadowColor">@color/colorToolbarArticleExpanded</item>
+        <item name="android:shadowRadius">2</item>
+        <item name="android:textSize">22sp</item>
+    </style>
+
 
 </resources>
