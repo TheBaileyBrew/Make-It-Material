@@ -63,7 +63,7 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:textSize="@dimen/detail_body_text_size"
-            android:layout_margin="@dimen/margin_horizontal_8dp"/>
+            android:layout_margin="@dimen/margin_horizontal_16dp"/>
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
     <com.google.android.material.floatingactionbutton.FloatingActionButton
@@ -76,7 +76,7 @@
         app:fabSize="normal"
         android:src="@drawable/ic_share"
         android:scaleType="center"
-        app:layout_anchor="@id/article_body"
+        app:layout_anchor="@id/article_app_toolbar"
         app:layout_behavior="com.example.xyzreader.utils.FloatingActionButtonUtils"
         app:rippleColor="@color/colorAccent"/>
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

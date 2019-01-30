@@ -30,6 +30,6 @@
     <color name="colorToolbarCollapsed">@color/colorDarkTheme</color>
     <color name="colorToolbarExpanded">#fcfcfc</color>
 
-    <color name="colorToolbarArticleCollapsed">@color/colorDarkTheme</color>
-    <color name="colorToolbarArticleExpanded">#fcfcfc</color>
+    <color name="colorToolbarArticleCollapsed">@color/colorAccentDark</color>
+    <color name="colorToolbarArticleExpanded">@color/colorPrimaryDark</color>
 </resources>
